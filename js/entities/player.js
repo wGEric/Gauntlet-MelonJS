@@ -38,9 +38,9 @@ game.PlayerEntity = me.ObjectEntity.extend({
 
     // fire function throttled so that it fires only every once in a while
     this.fire = throttle(400, true, (function() {
-      var bullet = me.entityPool.newInstanceOf( "bullet", this.pos.x, this.pos.y, { direction : this.renderable.current.name } );
-      me.game.add( bullet, this.z );
-      me.game.sort();
+      var bullet = me.pool.pull( "bullet", this.pos.x, this.pos.y, { direction : this.renderable.current.name } );
+      me.game.world.addChild( bullet, this.z);
+      me.game.world.sort();
     }).bind(this) );
 
     this.oldVel = new me.Vector2d(0, 0);
@@ -51,7 +51,7 @@ game.PlayerEntity = me.ObjectEntity.extend({
      update the player pos
 
      ------ */
-  update: function() {
+  update: function(dt) {
 
     // shoot or move. Don't allow both at the same time
     if ( me.input.isKeyPressed( 'fire' ) ) {
@@ -78,37 +78,42 @@ game.PlayerEntity = me.ObjectEntity.extend({
       }
     }
 
+    // set the correct animation
+    var curAnimation;
+    if ( this.vel.x < 0 && this.vel.y === 0 ) {
+      curAnimation = 'walkLeft';
+    } else if ( this.vel.x > 0 && this.vel.y === 0 ) {
+      curAnimation = 'walkRight';
+    } else if ( this.vel.x === 0 && this.vel.y > 0 ) {
+      curAnimation = 'walkDown';
+    } else if ( this.vel.x === 0 && this.vel.y < 0 ) {
+      curAnimation = 'walkUp';
+    } else if ( this.vel.x > 0 && this.vel.y > 0 ) {
+      curAnimation = 'walkDownRight';
+    } else if ( this.vel.x > 0 && this.vel.y < 0 ) {
+      curAnimation = 'walkUpRight';
+    } else if ( this.vel.x < 0 && this.vel.y > 0 ) {
+      curAnimation = 'walkDownLeft';
+    } else if ( this.vel.x < 0 && this.vel.y < 0 ) {
+      curAnimation = 'walkUpLeft';
+    }
+
+    if (curAnimation && !this.renderable.isCurrentAnimation(curAnimation)) {
+      this.renderable.setCurrentAnimation(curAnimation);
+    }
+
     // check & update player movement
     this.updateMovement();
 
-    // set the correct animation
-    if ( this.vel.x < 0 && this.vel.y === 0 ) {
-      this.renderable.setCurrentAnimation( 'walkLeft' );
-    } else if ( this.vel.x > 0 && this.vel.y === 0 ) {
-      this.renderable.setCurrentAnimation( 'walkRight' );
-    } else if ( this.vel.x === 0 && this.vel.y > 0 ) {
-      this.renderable.setCurrentAnimation( 'walkDown' );
-    } else if ( this.vel.x === 0 && this.vel.y < 0 ) {
-      this.renderable.setCurrentAnimation( 'walkUp' );
-    } else if ( this.vel.x > 0 && this.vel.y > 0 ) {
-      this.renderable.setCurrentAnimation( 'walkDownRight' );
-    } else if ( this.vel.x > 0 && this.vel.y < 0 ) {
-      this.renderable.setCurrentAnimation( 'walkUpRight' );
-    } else if ( this.vel.x < 0 && this.vel.y > 0 ) {
-      this.renderable.setCurrentAnimation( 'walkDownLeft' );
-    } else if ( this.vel.x < 0 && this.vel.y < 0 ) {
-      this.renderable.setCurrentAnimation( 'walkUpLeft' );
-    }
-
-    var res = me.game.collide(this);
+    var res = me.game.world.collide(this);
 
     if ( res ) {
       // if we collide with an enemy
       if ( res.obj.type == me.game.ENEMY_OBJECT && res.obj.alive ) {
-        me.game.remove(res.obj);
-        me.game.sort();
+        me.game.world.removeChild(res.obj);
+        me.game.world.sort();
 
-        this.parent();
+        this.parent(dt);
         return true;
       }
     }
@@ -116,7 +121,7 @@ game.PlayerEntity = me.ObjectEntity.extend({
     // update animation if necessary
     if ( this.vel.x !== 0 || this.vel.y !== 0 ) {
       // update object animation
-      this.parent();
+      this.parent(dt);
       return true;
     }
 

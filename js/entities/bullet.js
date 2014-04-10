@@ -5,6 +5,14 @@ game.BulletEntity = me.ObjectEntity.extend({
     settings.spritewidth = 32;
     settings.spriteheight = 32;
 
+    if (!settings.width) {
+      settings.width = 32;
+    }
+
+    if (!settings.height) {
+      settings.height = 32;
+    }
+
     // call the constructor
     this.parent(x, y, settings);
 
@@ -18,11 +26,12 @@ game.BulletEntity = me.ObjectEntity.extend({
     this.renderable.setCurrentAnimation( 'shoot' );
 
     this.alwaysUpdate = true;
+    this.type = 'bullet';
 
     this.direction = settings.direction.replace('walk', '').toLowerCase();
   },
 
-  update: function() {
+  update: function(dt) {
     // up/down movement
     if ( this.direction.indexOf( 'up' ) !== -1 ) {
       this.vel.y -= this.accel.y * me.timer.tick;
@@ -41,22 +50,26 @@ game.BulletEntity = me.ObjectEntity.extend({
       this.vel.x = 0;
     }
 
+    var curAnimation;
     if ( this.vel.x < 0 || ( this.vel.x === 0 && this.vel.y < 0 ) ) {
-      this.renderable.setCurrentAnimation( 'shootLeft' );
+      curAnimation = 'shootLeft';
     } else {
-      this.renderable.setCurrentAnimation( 'shoot' );
+      curAnimation = 'shoot';
+    }
+
+    if (curAnimation && !this.renderable.isCurrentAnimation(curAnimation) && !this.renderable.isCurrentAnimation('explode')) {
+      this.renderable.setCurrentAnimation(curAnimation);
     }
 
     // check & update movement
     var envRes = this.updateMovement();
-    var res = me.game.collide(this);
 
     // remove if it hits a wall or goes off screen
     if ( envRes.xtile || envRes.ytile || ! this.inViewport ) {
 
       if ( ! this.inViewport ) {
         this.removeBullet();
-      } else {
+      } else  if (!this.renderable.isCurrentAnimation('explode')) {
         this.renderable.setCurrentAnimation( 'explode', (function () {
           this.removeBullet();
           return false; // do not reset to first frame
@@ -64,40 +77,24 @@ game.BulletEntity = me.ObjectEntity.extend({
       }
 
       // update object animation
-      this.parent();
+      this.parent(dt);
       return true;
-    }
-
-    if ( res ) {
-      // if we collide with an enemy
-      if ( res.obj.type == me.game.ENEMY_OBJECT && res.obj.alive ) {
-        res.obj.alive = false;
-        res.obj.collidable = false;
-        res.obj.renderable.setCurrentAnimation( 'explode', function() {
-          me.game.remove( res.obj );
-          me.game.sort();
-        } );
-
-        this.removeBullet();
-
-        this.parent();
-        return true;
-      }
     }
 
     if ( this.vel.x !== 0 || this.vel.y !== 0 ) {
       // update object animation
-      this.parent();
+      this.parent(dt);
       return true;
     }
 
     // else inform the engine we did not perform
     // any update (e.g. position, animation)
-    return false;
+    this.parent(dt);
+    return true;
   },
 
   removeBullet: function() {
-    me.game.remove( this );
-    me.game.sort();
+    me.game.world.removeChild( this );
+    me.game.world.sort();
   }
 });

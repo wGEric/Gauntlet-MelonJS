@@ -22,13 +22,15 @@ game.EnemyEntity = me.ObjectEntity.extend({
     this.renderable.addAnimation( 'explode', [ 328, 329, 330, 331, 332, 333 ] );
     this.renderable.setCurrentAnimation( 'walkUp' );
 
+    this.alive = true;
+
     // make it collidable
     this.collidable = true;
 
     // make it a enemy object
     this.type = me.game.ENEMY_OBJECT;
 
-    this.player = me.game.getEntityByName( 'mainPlayer' )[0];
+    this.player = me.game.world.getChildByName( 'mainPlayer' )[0];
 
     // this.tile = {
     //  x: null,
@@ -36,13 +38,9 @@ game.EnemyEntity = me.ObjectEntity.extend({
     // };
   },
 
-  update: function() {
-    if ( ! this.inViewport ) {
-      return false;
-    }
-
+  update: function(dt) {
     if ( ! this.alive ) {
-      this.parent();
+      this.parent(dt);
       return true;
     }
 
@@ -70,22 +68,7 @@ game.EnemyEntity = me.ObjectEntity.extend({
       this.vel.y = 0;
     }
 
-    // This isn't working to prevent monsters from
-    // bouncing back and forth when it is moving
-    // beyond the player. It is late and I can't think
-    // of the logic behind it.
-    //
-    // var diffx = ( this.vel.x + x ) - px;
-    // if ( diffx < this.vel.x ) {
-    //  this.vel.x = diffx;
-    // }
-
-    // var diffy = ( this.vel.y + y ) - py);
-    // if ( diffy < this.vel.y ) {
-    //  this.vel.y = diffy;
-    // }
-
-    var results = me.game.collide(this, true),
+    var results = me.game.world.collide(this, true),
     res;
 
     if ( results.length > 0 ) {
@@ -101,42 +84,61 @@ game.EnemyEntity = me.ObjectEntity.extend({
           if ( ( res.y > 0 && this.vel.y > 0 ) || ( res.y < 0 && this.vel.y < 0 ) ) {
             this.vel.y = 0;
           }
+        } else if ( res.obj.type == 'bullet' && this.alive ) {
+          this.alive = false;
+          this.collidable = false;
+          this.vel.x = 0;
+          this.vel.y = 0;
+
+          res.obj.removeBullet();
+
+          if (!this.renderable.isCurrentAnimation('explode')) {
+            this.renderable.setCurrentAnimation( 'explode', (function() {
+              me.game.world.removeChild( this );
+              me.game.world.sort();
+            }).bind(this) );
+          }
+
         }
       }
+    }
+
+    var curAnimation;
+    if ( this.vel.x < 0 && this.vel.y === 0 ) {
+      curAnimation = 'walkLeft';
+    } else if ( this.vel.x > 0 && this.vel.y === 0 ) {
+      curAnimation = 'walkRight';
+    } else if ( this.vel.x === 0 && this.vel.y > 0 ) {
+      curAnimation = 'walkDown';
+    } else if ( this.vel.x === 0 && this.vel.y < 0 ) {
+      curAnimation = 'walkUp';
+    } else if ( this.vel.x > 0 && this.vel.y > 0 ) {
+      curAnimation = 'walkDownRight';
+    } else if ( this.vel.x > 0 && this.vel.y < 0 ) {
+      curAnimation = 'walkUpRight';
+    } else if ( this.vel.x < 0 && this.vel.y > 0 ) {
+      curAnimation = 'walkDownLeft';
+    } else if ( this.vel.x < 0 && this.vel.y < 0 ) {
+      curAnimation = 'walkUpLeft';
+    }
+
+    if (curAnimation && !this.renderable.isCurrentAnimation(curAnimation)) {
+      this.renderable.setCurrentAnimation(curAnimation);
     }
 
     this.updateMovement();
 
     // update animation if necessary
     if ( this.vel.x !== 0 || this.vel.y !== 0 ) {
-
-      // set the correct animation
-      if ( this.vel.x < 0 && this.vel.y === 0 ) {
-        this.renderable.setCurrentAnimation( 'walkLeft' );
-      } else if ( this.vel.x > 0 && this.vel.y === 0 ) {
-        this.renderable.setCurrentAnimation( 'walkRight' );
-      } else if ( this.vel.x === 0 && this.vel.y > 0 ) {
-        this.renderable.setCurrentAnimation( 'walkDown' );
-      } else if ( this.vel.x === 0 && this.vel.y < 0 ) {
-        this.renderable.setCurrentAnimation( 'walkUp' );
-      } else if ( this.vel.x > 0 && this.vel.y > 0 ) {
-        this.renderable.setCurrentAnimation( 'walkDownRight' );
-      } else if ( this.vel.x > 0 && this.vel.y < 0 ) {
-        this.renderable.setCurrentAnimation( 'walkUpRight' );
-      } else if ( this.vel.x < 0 && this.vel.y > 0 ) {
-        this.renderable.setCurrentAnimation( 'walkDownLeft' );
-      } else if ( this.vel.x < 0 && this.vel.y < 0 ) {
-        this.renderable.setCurrentAnimation( 'walkUpLeft' );
-      }
-
       // update object animation
-      this.parent();
+      this.parent(dt);
       return true;
     }
 
     // else inform the engine we did not perform
     // any update (e.g. position, animation)
-    return false;
+    this.parent(dt);
+    return true;
   }
 
 });
